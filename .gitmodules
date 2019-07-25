@@ -1,0 +1,3 @@
+[submodule "AutoIt-FSOClass"]
+	path = AutoIt-FSOClass
+	url = git://github.com/coldscientist/AutoIt-FSOObject.git
