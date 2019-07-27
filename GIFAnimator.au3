@@ -26,10 +26,11 @@
 
 #include <GuiTab.au3>
 
-#include "GIFAnimatorPreview.au3"
-
 ; _FolderExists
 #include "AutoIt-FSOClass\FSOClass.au3"
+
+; IsHungAppWindow
+#include <WinAPISysWin.au3>
 
 Opt("MustDeclareVars", 1)
 
@@ -92,17 +93,12 @@ EndIf
 Global $hWnd = Null
 Global $GIFAnimatorhWnd = Null
 
-Global $bPreview = False
 Global $GIFOriginalPath = Null
 Global $aGIF[2] ; Initiate the array.
 
 GIFAnimatorParseArguments()
 
-If $bPreview = False Then
-   GIFAnimator()
-Else
-   GIFAnimatorPreview($aGIF[1])
-EndIf
+GIFAnimator()
 
 ;===============================================================================
 ;
@@ -126,6 +122,14 @@ Func GIfAnimator()
    ; https://www.autoitscript.com/forum/topic/136041-solved-_filelisttoarray-need-an-explanation/
    For $i = 1 to UBound($aGIF) -1
 	  ConsoleWrite( "(" & ($i) & " of " & $aGIF[0] & ") " & $aGIF[$i] & @crlf)
+
+	  ; https://www.autoitscript.com/forum/topic/120516-test-for-window-responsiveness/
+	  While 1
+		 If _WinAPI_IsHungAppWindow(HWnd($GIFAnimatorhWnd)) = False Then
+			ExitLoop
+		 EndIf
+		 Sleep(5000)
+	  WEnd
 
 	  GIFAnimatorOpen($aGIF[$i])
 
@@ -159,7 +163,7 @@ Func GIfAnimator()
 	  EndIf
 
 	  ; https://www.autoitscript.com/autoit3/docs/intro/lang_operators.htm
-	  If $iDuration <= 4 Then
+	  If $iDuration <= 5 Then
 		 ContinueLoop ; Do Nothing
 	  EndIf
 
@@ -176,10 +180,10 @@ Func GIfAnimator()
 	  Local $aPathSplit = _PathSplit($aGIF[$i], $sDrive, $sDir, $sFileName, $sExtension)
 	  ; _ArrayDisplay($aPathSplit, "_PathSplit of " & @ScriptFullPath)
 
-	  Local $sBackupFile = $GIFOriginal & "\" & $sFileName & $sExtension
+	  Local $sBackupFile = $GIFOriginalPath & "\" & $sFileName & $sExtension
 	  If FileExists($sBackupFile) Then
 		 For $j = 0 to 4294967295
-			$sBackupFile = $GIFOriginal & "\" & $sFileName & " (" & $j & ")" & $sExtension
+			$sBackupFile = $GIFOriginalPath & "\" & $sFileName & " (" & $j & ")" & $sExtension
 			If Not FileExists($sBackupFile) Then
 			   ExitLoop
 			EndIf
@@ -207,6 +211,7 @@ Func GIfAnimator()
 
 	  ; Writing
 	  ; http://www.autoitscript.com/forum/topic/95905-wait-until-button-text-ok/
+	  Local $sReady = Null
 	  While 1
 		 ; https://www.autoitscript.com/forum/topic/4646-text-with-edit-and-static-classes/
 		 $sReady = ControlGetText(HWnd($GIFAnimatorhWnd), "", "[CLASS:Static; INSTANCE:25]")
@@ -305,7 +310,6 @@ Func GIFAnimatorParseArguments()
    Local $V_Arg = "Valid Arguments are: " & @CRLF
    $V_Arg = $V_Arg & "    [Directory] - Search for *.GIF files into Directory." & @CRLF
    $V_Arg = $V_Arg & "    [File] - Open *.GIF file." & @CRLF
-   $V_Arg = $V_Arg & "    /preview - Preview *.GIF file (available only for [File])." & @CRLF
    $V_Arg = $V_Arg & "    /debug - Enable debug messages."
    ;$V_Arg = $V_Arg & "    /s       - Search for *.GIF Files Recursively into Subdirectories." & @CRLF
    ; retrieve commandline parameters
@@ -315,8 +319,6 @@ Func GIFAnimatorParseArguments()
 			$GIFAnimatorDebug = True
 		 ;Case $CmdLine[$x] = "/s"
 
-		 Case $CmdLine[$x] = "/preview"
-			$bPreview = True
 		 Case $CmdLine[$x] = "/?" Or $CmdLine[$x] = "/h" Or $CmdLine[$x] = "/help"
 			MsgBox( 1, "GIFAnimator", "" & $v_Arg,)
 			Exit
@@ -354,10 +356,10 @@ Func GIFAnimatorParseArguments()
 			$aGIF[$i] = $sDirPath & "\" & $aGIF[$i]
 		 Next
 
-		 $GIFOriginal = $sDirPath & "\GIF (Original)"
-		 If Not _FolderExists($GIFOriginal) Then
-			If Not DirCreate($GIFOriginal) Then
-			   MsgBox(0, "GIFAnimator", "Could not create " & Quotes($GIFOriginal) & " directory. Aborting.")
+		 $GIFOriginalPath = $sDirPath & "\GIF (Original)"
+		 If Not _FolderExists($GIFOriginalPath) Then
+			If Not DirCreate($GIFOriginalPath) Then
+			   MsgBox(0, "GIFAnimator", "Could not create " & Quotes($GIFOriginalPath) & " directory. Aborting.")
 			   Exit
 			EndIf
 		 EndIf
