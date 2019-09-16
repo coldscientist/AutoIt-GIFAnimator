@@ -37,7 +37,7 @@ Opt("MustDeclareVars", 1)
 AutoItSetOption("MouseCoordMode", 2)
 AutoItSetOption("TrayIconDebug", 1)
 ;OnAutoItExitRegister("OnAutoItExit")
-HotKeySet("{ESCAPE}", "OnAutoItExit")
+HotKeySet("{ESCAPE}", "GIFAnimatorQuit")
 
 Global $GIFAnimatorDebug = True
 
@@ -287,15 +287,16 @@ EndFunc   ;==>_FileSelectFolder
 Func _WaitSelectDialog()
    While 1
 	  ; Retrieve a list of window handles.
-	  Local $aList = WinList()
+	  Local $aWinList = WinList()
 
-	  ; Loop through the array displaying only visable windows with a title.
-	  For $i = 1 To $aList[0][0]
-		 If $aList[$i][0] <> "" And BitAND(WinGetState($aList[$i][1]), 2) Then
-			; If $GIFAnimatorDebug = True Then ConsoleWrite("Title: " & $aList[$i][0] & @CRLF & "Handle: " & $aList[$i][1] & " Parent ID: " & _WinAPI_GetParent ( $aList[$i][1] ) & @CRLF)
-			; If $GIFAnimatorDebug = True Then ConsoleWrite("If " & _WinAPI_GetParent ( $aList[$i][1] ) & " = " & $GIFAnimatorhWnd & " Then" & @CRLF)
-			If _WinAPI_GetParent ( $aList[$i][1] ) = $GIFAnimatorhWnd Then
-			   Return $aList[$i][1]
+	  ; Run through GUIs to find those associated with the process
+	  For $i = 1 To $aWinList[0][0]
+		 ; Loop through the array displaying only visable windows with a title.
+		 If $aWinList[$i][0] <> "" And BitAND(WinGetState($aWinList[$i][1]), 2) Then
+			; If $GIFAnimatorDebug = True Then ConsoleWrite("Title: " & $aWinList[$i][0] & @CRLF & "Handle: " & $aWinList[$i][1] & "PID: " & WinGetProcess($aWinList[$i][1]) & " Parent ID: " & _WinAPI_GetParent ( $aWinList[$i][1] ) & @CRLF)
+			; If $GIFAnimatorDebug = True Then ConsoleWrite("If " & _WinAPI_GetParent ( $aWinList[$i][1] ) & " = " & $GIFAnimatorhWnd & " Then" & @CRLF)
+			If _WinAPI_GetParent ( $aWinList[$i][1] ) = $GIFAnimatorhWnd Then
+			   Return $aWinList[$i][1]
 			EndIf
 		 EndIf
 	  Next
@@ -320,7 +321,7 @@ Func GIFAnimatorParseArguments()
 		 ;Case $CmdLine[$x] = "/s"
 
 		 Case $CmdLine[$x] = "/?" Or $CmdLine[$x] = "/h" Or $CmdLine[$x] = "/help"
-			MsgBox( 1, "GIFAnimator", "" & $v_Arg,)
+			MsgBox( 1, "GIFAnimator", "" & $v_Arg)
 			Exit
 		 Case Else
 			If _FolderExists($CmdLine[$x]) Then
@@ -330,7 +331,7 @@ Func GIFAnimatorParseArguments()
 			   $sFilePath = $CmdLine[$x]
 			   If $GIFAnimatorDebug = True Then ConsoleWrite("[File]: " & $sFilePath & @CRLF)
 			Else
-			   MsgBox( 1, "GIFAnimator", "Wrong commandline argument: " & $CmdLine[$x] & @CRLF & $v_Arg,)
+			   MsgBox( 1, "GIFAnimator", "Wrong commandline argument: " & $CmdLine[$x] & @CRLF & $v_Arg)
 			   Exit
 			EndIf
 	  EndSelect
@@ -413,6 +414,10 @@ Func GIFAnimatiorWidthHeight()
    If $GIFAnimatorDebug = True Then ConsoleWrite("New Height: " & Int($iAnimationHeight / 2) & @CRLF)
    ControlSetText(HWnd($GIFAnimatorhWnd), "", "[CLASS:Edit; INSTANCE:2]", Int($iAnimationHeight / 2))
    Sleep(2000)
+EndFunc
+
+Func GIFAnimatorQuit()
+   Exit
 EndFunc
 
 Func Quotes($sString)
