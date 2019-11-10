@@ -1,7 +1,7 @@
 #cs ----------------------------------------------------------------------------
 
  Title: GIFAnimator
- Version: 1.0.0
+ Version: 1.0.1.0
  AutoIt Version: 3.3.14.5
  Author:         Eduardo Mozart de Oliveira
 
@@ -19,6 +19,8 @@
 
 ; _GUICtrlToolbar
 #include <GuiToolbar.au3>
+; GetAllWindowsControls
+; #include "Functions.au3"
 
 #include <WinAPISysWin.au3>
 
@@ -32,16 +34,24 @@
 ; IsHungAppWindow
 #include <WinAPISysWin.au3>
 
+; _GDIPlus
+#include <_GDIPlus_GIFAnim.au3>
+
 Opt("MustDeclareVars", 1)
 
 AutoItSetOption("MouseCoordMode", 2)
 AutoItSetOption("TrayIconDebug", 1)
 ;OnAutoItExitRegister("OnAutoItExit")
-HotKeySet("{ESCAPE}", "GIFAnimatorQuit")
+HotKeySet("^e", "GIFAnimatorQuit")
 
 Global $GIFAnimatorDebug = True
 
 Global $GIFAnimatorPath = Null
+
+; https://www.autoitscript.com/forum/topic/44440-function-time-limits/
+Global $Timeout = False
+Global $Time = TimerInit()
+; AdlibRegister("_TimeCheck", 100)
 
 If _Singleton(@ScriptName, 1) = 0 Then
    MsgBox($MB_SYSTEMMODAL, "GIFAnimator", "An occurrence of " & @ScriptName & " is already running. Aborting.")
@@ -116,15 +126,23 @@ Func GIfAnimator()
    Run($GIFAnimatorPath)
    $hWnd = WinWait("Microsoft Gif Animator")
    $GIFAnimatorhWnd = String($hWnd)
+   AdlibRegister("GIFAnimatorClose")
    If $GIFAnimatorDebug = True Then ConsoleWrite("GIFAnimator.exe hWnd: " & $GIFAnimatorhWnd & @CRLF)
-   Global $hToolbars = ControlGetHandle(HWnd($GIFAnimatorhWnd), "", "[CLASS:ToolbarWindow32; INSTANCE:1]")
+   Global $hToolbar = ControlGetHandle(HWnd($GIFAnimatorhWnd), "", "[CLASS:ToolbarWindow32; INSTANCE:1]")
 
    ; https://www.autoitscript.com/forum/topic/136041-solved-_filelisttoarray-need-an-explanation/
    For $i = 1 to UBound($aGIF) -1
 	  ConsoleWrite( "(" & ($i) & " of " & $aGIF[0] & ") " & $aGIF[$i] & @crlf)
+	  Local $aDuration = _GetGIFDuration($aGIF[$i])
+	  Local $iDuration = $aDuration[0] / 10
+	  ConsoleWrite("Duration: " & $iDuration & @CRLF)
+	  If $iDuration <= 5 Then
+	  	 ContinueLoop ; Do Nothing
+	  EndIf
 
 	  ; https://www.autoitscript.com/forum/topic/120516-test-for-window-responsiveness/
 	  While 1
+		 If $GIFAnimatorDebug Then ConsoleWrite("_WinAPI_IsHungAppWindow: " & _WinAPI_IsHungAppWindow(HWnd($GIFAnimatorhWnd)))
 		 If _WinAPI_IsHungAppWindow(HWnd($GIFAnimatorhWnd)) = False Then
 			ExitLoop
 		 EndIf
@@ -154,26 +172,40 @@ Func GIfAnimator()
 	  WEnd
 	  ControlFocus(HWnd($GIFAnimatorhWnd), "", "[CLASS:Edit; INSTANCE:3]")
 
-	  Local $iDuration = ControlGetText(HWnd($GIFAnimatorhWnd), "", "[CLASS:Edit; INSTANCE:3]") ; 1 = 10 msec
-	  If @error Then
-		 ConsoleWrite("Error reading Duration data.")
-		 Exit
-	  Else
-		 ConsoleWrite("Duration: " & $iDuration & @CRLF)
-	  EndIf
+	  ; Local $iDuration = ControlGetText(HWnd($GIFAnimatorhWnd), "", "[CLASS:Edit; INSTANCE:3]") ; 1 = 10 msec
+	  ; If @error Then
+	  ; 	ConsoleWrite("Error reading Duration data.")
+	  ; 	Exit
+	  ; Else
+	  ;		ConsoleWrite("Duration: " & $iDuration & @CRLF)
+	  ; EndIf
 
 	  ; https://www.autoitscript.com/autoit3/docs/intro/lang_operators.htm
-	  If $iDuration <= 5 Then
-		 ContinueLoop ; Do Nothing
-	  EndIf
+	  ; If $iDuration <= 5 Then
+	  ;	 ContinueLoop ; Do Nothing
+	  ; EndIf
 
 	  ; Select All (CTRL + L)
-	  If Not WinActive(HWnd($GIFAnimatorhWnd)) Then WinActivate(HWnd($GIFAnimatorhWnd))
-	  _GUICtrlToolbar_ClickIndex($hToolbars, 11)
+	  ; Insert isn't enable when Select All is clicked
+	  Local $bToolbarInsert = Null
+	  While 1
+		 If Not WinActive(HWnd($GIFAnimatorhWnd)) Then WinActivate(HWnd($GIFAnimatorhWnd))
+		 ; _ArrayDisplay(GetAllWindowsControls(HWnd($GIFAnimatorhWnd)))
+		 ; $bToolbarInsert = ControlCommand(HWnd($GIFAnimatorhWnd), "", $hToolbar, "IsEnabled", _GUICtrlToolbar_IndexToCommand($hToolbar, 3))
+		 Local $aToolbarInsert = _GUICtrlToolbar_GetButtonInfo($hToolbar, _GUICtrlToolbar_IndexToCommand($hToolbar, 3)) ; _GUICtrlToolbar_GetButtonState
+		 ; _ArrayDisplay($aToolbarInsert)
+		 Local $iToolbarInsertState = $aToolbarInsert[1]
+		 If $GIFAnimatorDebug Then ConsoleWrite("Toolbar Button 'Insert' (Command ID: " & _GUICtrlToolbar_IndexToCommand($hToolbar, 3) & ") State: " & $iToolbarInsertState & @CRLF)
+		 If $iToolbarInsertState = 0 Then ExitLoop ; Insert Button Disabled
+		 _GUICtrlToolbar_ClickIndex($hToolbar, 11)
+		 ; ControlCommand(HWnd($GIFAnimatorhWnd), "", $hToolbar, "SendCommandID", _GUICtrlToolbar_IndexToCommand($hToolbar, 11))
+		 Sleep(100)
+	  WEnd
 
 	  ; Change Duration
-	  If $GIFAnimatorDebug = True Then ConsoleWrite("New Duration: " & Int($iDuration / 2) & @CRLF)
-	  ControlSetText(HWnd($GIFAnimatorhWnd), "", "[CLASS:Edit; INSTANCE:3]", Int($iDuration / 2))
+	  If Not WinActive(HWnd($GIFAnimatorhWnd)) Then WinActivate(HWnd($GIFAnimatorhWnd))
+	  If $GIFAnimatorDebug = True Then ConsoleWrite("New Duration: " & Ceiling($iDuration / 2) & @CRLF)
+	  ControlSetText(HWnd($GIFAnimatorhWnd), "", "[CLASS:Edit; INSTANCE:3]", Ceiling($iDuration / 2))
 
 	  ; Create backup file
 	  Local $sDrive = "", $sDir = "", $sFileName = "", $sExtension = ""
@@ -203,11 +235,7 @@ Func GIfAnimator()
 	  EndIf
 
 	  ; Save As (Ctrl + A)
-	  If Not WinActive(HWnd($GIFAnimatorhWnd)) Then WinActivate(HWnd($GIFAnimatorhWnd))
-	  _GUICtrlToolbar_ClickIndex($hToolbars, 4)
-	  Local $shWnd = _WaitSelectDialog()
-	  WinActivate($shWnd)
-	  Send("{ENTER}")
+	  GIFAnimatorSaveAsDialog()
 
 	  ; Writing
 	  ; http://www.autoitscript.com/forum/topic/95905-wait-until-button-text-ok/
@@ -218,29 +246,57 @@ Func GIfAnimator()
 		 If $GIFAnimatorDebug = True Then ConsoleWrite("Ready (Writing): " & $sReady & @CRLF)
 		 Sleep(100)
 		 If $sReady = "Ready" Then
+			If Not WinActive(HWnd($GIFAnimatorhWnd)) Then WinActivate(HWnd($GIFAnimatorhWnd))
 			ExitLoop
 		 EndIf
 	  WEnd
    Next
 EndFunc    ;==>GIFAnimator
 
+Func GIFAnimatorSaveAsDialog()
+   If Not WinActive(HWnd($GIFAnimatorhWnd)) Then WinActivate(HWnd($GIFAnimatorhWnd))
+   _GUICtrlToolbar_ClickIndex($hToolbar, 4)
+   Local $ohWnd = _WaitSelectDialog()
+   If $Timeout Then
+	  $Timeout = False
+	  GIFAnimatorSaveAsDialog()
+	  Return
+   EndIf
+   WinActivate($ohWnd)
+   ; ControlSend{"{ENTER}")
+   ControlClick($ohWnd, "", "Button2")
+EndFunc
+
 Func GIFAnimatorOpen($sFilePath)
    If Not WinActive(HWnd($GIFAnimatorhWnd)) Then WinActivate(HWnd($GIFAnimatorhWnd))
 
    ; New (CTRL + N)
    ; https://www.autoitscript.com/forum/topic/155068-toolsbar-understanding-how-to-access-these-controls/
-   _GUICtrlToolbar_ClickIndex($hToolbars, 0)
+   _GUICtrlToolbar_ClickIndex($hToolbar, 0)
 
    ; Open (CTRL + O)
-   _GUICtrlToolbar_ClickIndex($hToolbars, 1)
+   _GUICtrlToolbar_ClickIndex($hToolbar, 1)
 
+   $Time = TimerInit()
    Local $ohWnd = _WaitSelectDialog()
+   ; Probably user intervation, so let's ignore it
+   If WinGetTitle($ohWnd) = "File Not Saved" Then
+	  ControlClick($ohWnd, "", "Button2")
+	  $Timeout = True
+   EndIf
+   If $Timeout Then
+	  $Timeout = False
+	  If Not WinExists($ohWnd) Then ; Valid HWnd
+		 GIFAnimatorOpen($sFilePath)
+	  EndIf
+	  Return
+   EndIf
 
    ; https://www.autoitscript.com/forum/topic/166908-cant-controll-class32770-windows-7/
    If Not WinActive($ohWnd) Then WinActivate($ohWnd)
    WinWaitActive($ohWnd)
    ControlSetText($ohWnd, "", "[CLASS:Edit; INSTANCE:1]", $sFilePath) ; Set the edit control in Open with some text. The handle returned by WinWait is used for the "title" parameter of ControlSetText.
-   ControlSend($ohWnd,"", 1,"{ENTER}")
+   ControlClick($ohWnd, "", "Button2")
 
    ; Reading
    ; http://www.autoitscript.com/forum/topic/95905-wait-until-button-text-ok/
@@ -248,12 +304,19 @@ Func GIFAnimatorOpen($sFilePath)
    While 1
 	  ; https://www.autoitscript.com/forum/topic/4646-text-with-edit-and-static-classes/
 	  $sReady = ControlGetText(HWnd($GIFAnimatorhWnd), "", "[CLASS:Static; INSTANCE:8]")
+	  If _IsEmpty($sReady) Then $sReady = ControlGetText(HWnd($GIFAnimatorhWnd), "", "[CLASS:Static; INSTANCE:25]")
 	  If $GIFAnimatorDebug = True Then ConsoleWrite("Ready (Open): " & $sReady & @CRLF)
 	  Sleep(100)
 	  If $sReady = "Ready" Then
+		 $sReady = ControlGetText(HWnd($GIFAnimatorhWnd), "", "[CLASS:Static; INSTANCE:25]")
 		 ExitLoop
 	  EndIf
    WEnd
+
+   If Not StringInStr(WinGetTitle(HWnd($GIFAnimatorhWnd)), ".gif") Then
+	  GIFAnimatorOpen($sFilePath)
+	  Return
+   EndIf
 
    Local $iTabCount = 1
    While 1
@@ -285,6 +348,7 @@ Func _FileSelectFolder()
 EndFunc   ;==>_FileSelectFolder
 
 Func _WaitSelectDialog()
+   $Time = TimerInit()
    While 1
 	  ; Retrieve a list of window handles.
 	  Local $aWinList = WinList()
@@ -300,6 +364,12 @@ Func _WaitSelectDialog()
 			EndIf
 		 EndIf
 	  Next
+
+	  ; Timeout at 5sec
+	  If TimerDiff($Time) > 5 * 1000 Then
+		 $Timeout = True
+		 Return
+	  EndIf
    WEnd
 EndFunc   ;==>_WaitSelectDialog
 
@@ -416,8 +486,40 @@ Func GIFAnimatiorWidthHeight()
    Sleep(2000)
 EndFunc
 
+Func GIFAnimatorClose()
+   If Not ProcessExists(WinGetProcess(HWnd($GIFAnimatorhWnd))) Then
+	  GIFAnimatorQuit()
+   EndIf
+EndFunc
+
 Func GIFAnimatorQuit()
    Exit
+EndFunc
+
+Func _IsEmpty($vVal)
+    If IsArray($vVal) And (Eval($vVal) == '') Then
+        Return True
+    ElseIf ($vVal == '') Then
+        Return True
+    EndIf
+    Return 0
+ EndFunc
+
+Func _GetGIFDuration($sFilePath)
+   ; https://autoit.de/thread/46160-animiertes-gif-in-einzelne-frames-splitten/
+   _GDIPlus_Startup()
+   ; Local $binGif = Binary(FileRead($sFilePath))
+   ; Local $hGIFImage = _GDIPlus_BitmapCreateFromMemory($binGif)
+   Local $hGIFImage = _GDIPlus_ImageLoadFromFile($sFilePath) ; https://www.autoitscript.com/forum/topic/196504-load-image-handle-of-file/
+   Local $iAnimDimCount = _GDIPlus_GIFAnimGetFrameDimensionsCount($hGIFImage)
+   Local $tGUID = _GDIPlus_GIFAnimGetFrameDimensionsList($hGIFImage, $iAnimDimCount)
+   Local $iAnimFrameCount = _GDIPlus_GIFAnimGetFrameCount($hGIFImage, $tGUID)
+   ; _ArrayDisplay(_GDIPlus_GIFAnimGetFrameDelays($hGIFImage, $iAnimFrameCount))
+   Local $aDuration =  _GDIPlus_GIFAnimGetFrameDelays($hGIFImage, $iAnimFrameCount)
+   _GDIPlus_ImageDispose($hGIFImage)
+   _GDIPlus_Shutdown()
+
+   Return $aDuration
 EndFunc
 
 Func Quotes($sString)
