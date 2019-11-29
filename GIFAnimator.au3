@@ -24,6 +24,7 @@
 
 #include <WinAPISysWin.au3>
 
+; _Singleton
 #include <Misc.au3>
 
 #include <GuiTab.au3>
@@ -31,7 +32,7 @@
 ; _FolderExists
 #include "AutoIt-FSOClass\FSOClass.au3"
 
-; IsHungAppWindow
+; _WinAPI_IsHungAppWindow
 #include <WinAPISysWin.au3>
 
 ; _GDIPlus
@@ -94,7 +95,7 @@ If $GIFAnimatorPath = Null Then
 	  If FileExists($ProgramFilesDir & "\Microsoft GIF Animator\GIFAnimator.exe") Then
 		 $GIFAnimatorPath = $ProgramFilesDir & "\Microsoft GIF Animator\GIFAnimator.exe"
 	  Else
-		 MsgBox(BitOr($MB_ICONERROR, $MB_SYSTEMMODAL), "GIFAnimator.au3", "GIFAnimator.exe could not be found at " & Quotes($ProgramFilesDir & "\Microsoft GIF Animator\GIFAnimator.exe") & " or " & $ImageComposerAddIn & ". Aborting.")
+		 MsgBox(BitOr($MB_ICONERROR, $MB_SYSTEMMODAL), "GIFAnimator.au3", "GIFAnimator.exe could not be found at " & _Quotes($ProgramFilesDir & "\Microsoft GIF Animator\GIFAnimator.exe") & " or " & $ImageComposerAddIn & ". Aborting.")
 		 Exit
 	  EndIf
    EndIf
@@ -142,7 +143,7 @@ Func GIfAnimator()
 
 	  ; https://www.autoitscript.com/forum/topic/120516-test-for-window-responsiveness/
 	  While 1
-		 If $GIFAnimatorDebug Then ConsoleWrite("_WinAPI_IsHungAppWindow: " & _WinAPI_IsHungAppWindow(HWnd($GIFAnimatorhWnd)))
+		 If $GIFAnimatorDebug Then ConsoleWrite("_WinAPI_IsHungAppWindow: " & _WinAPI_IsHungAppWindow(HWnd($GIFAnimatorhWnd)) & @CRLF)
 		 If _WinAPI_IsHungAppWindow(HWnd($GIFAnimatorhWnd)) = False Then
 			ExitLoop
 		 EndIf
@@ -224,12 +225,12 @@ Func GIfAnimator()
 
 	  FileCopy($aGIF[$i], $sBackupFile)
 	  If Not FileExists($sBackupFile) Then
-		 MsgBox(0, "GIFAnimator", "Could not create backup file in " & Quotes($sBackupFile) & ". Aborting.")
+		 MsgBox(0, "GIFAnimator", "Could not create backup file in " & _Quotes($sBackupFile) & ". Aborting.")
 		 Exit
 	  Else
 		 FileDelete($aGIF[$i])
 		 If FileExists($aGIF[$i]) Then
-			MsgBox(0, "GIFAnimator", "Could not delete " & Quotes($aGIF[$i]) & " file. Aborting.")
+			MsgBox(0, "GIFAnimator", "Could not delete " & _Quotes($aGIF[$i]) & " file. Aborting.")
 			Exit
 		 EndIf
 	  EndIf
@@ -422,7 +423,7 @@ Func GIFAnimatorParseArguments()
 	  ; https://www.autoitscript.com/forum/topic/142989-scan-for-certain-file-types/
 	  ; Shows the filenames gif files in the current directory.
 	  $aGIF = _FileListToArray($sDirPath, "*.gif*", 1)
-	  If IsArray($aGif) Then
+	  If IsArray($aGIF) Then
 		 For $i = 1 to UBound($aGIF) -1
 			$aGIF[$i] = $sDirPath & "\" & $aGIF[$i]
 		 Next
@@ -430,7 +431,7 @@ Func GIFAnimatorParseArguments()
 		 $GIFOriginalPath = $sDirPath & "\GIF (Original)"
 		 If Not _FolderExists($GIFOriginalPath) Then
 			If Not DirCreate($GIFOriginalPath) Then
-			   MsgBox(0, "GIFAnimator", "Could not create " & Quotes($GIFOriginalPath) & " directory. Aborting.")
+			   MsgBox(0, "GIFAnimator", "Could not create " & _Quotes($GIFOriginalPath) & " directory. Aborting.")
 			   Exit
 			EndIf
 		 EndIf
@@ -438,7 +439,7 @@ Func GIFAnimatorParseArguments()
    EndIf
 
    If Not IsArray($aGIF) Then
-	  MsgBox(0, "GIFAnimator", "No GIF files found at " & Quotes($sDirPath) & ". Aborting.")
+	  MsgBox(0, "GIFAnimator", "No GIF files found at " & _Quotes($sDirPath) & ". Aborting.")
 	  Exit
    EndIf
 
@@ -522,6 +523,6 @@ Func _GetGIFDuration($sFilePath)
    Return $aDuration
 EndFunc
 
-Func Quotes($sString)
+Func _Quotes($sString)
    Return Chr(34) & $sString & Chr(34)
 EndFunc   ;==>Quotes
