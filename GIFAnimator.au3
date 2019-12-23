@@ -29,14 +29,14 @@
 
 #include <GuiTab.au3>
 
-; _FolderExists
-#include "AutoIt-FSOClass\FSOClass.au3"
-
 ; _WinAPI_IsHungAppWindow
 #include <WinAPISysWin.au3>
 
 ; _GDIPlus
-#include <_GDIPlus_GIFAnim.au3>
+#include "Imports\_GDIPlus_GIFAnim.au3"
+
+; _GetHwndFromPID, _WinChildDialogs
+#include "Imports\AutoIt-ProcessClass\ProcessClass.au3"
 
 Opt("MustDeclareVars", 1)
 
@@ -49,13 +49,8 @@ Global $GIFAnimatorDebug = True
 
 Global $GIFAnimatorPath = Null
 
-; https://www.autoitscript.com/forum/topic/44440-function-time-limits/
-Global $Timeout = False
-Global $Time = TimerInit()
-; AdlibRegister("_TimeCheck", 100)
-
 If _Singleton(@ScriptName, 1) = 0 Then
-   MsgBox($MB_SYSTEMMODAL, "GIFAnimator", "An occurrence of " & @ScriptName & " is already running. Aborting.")
+   MsgBox($MB_ICONERROR, "GIFAnimator", "An occurrence of " & @ScriptName & " is already running. Aborting.")
    Exit
 EndIf
 
@@ -124,7 +119,7 @@ GIFAnimator()
 ;
 ;===============================================================================
 Func GIfAnimator()
-   Run($GIFAnimatorPath)
+   Local $PID = Run($GIFAnimatorPath)
    $hWnd = WinWait("Microsoft Gif Animator")
    $GIFAnimatorhWnd = String($hWnd)
    AdlibRegister("GIFAnimatorClose")
@@ -135,6 +130,8 @@ Func GIfAnimator()
    For $i = 1 to UBound($aGIF) -1
 	  ConsoleWrite( "(" & ($i) & " of " & $aGIF[0] & ") " & $aGIF[$i] & @crlf)
 	  Local $aDuration = _GetGIFDuration($aGIF[$i])
+	  ; _ArrayDisplay($aDuration)
+	  If Not IsArray($aDuration) Then ContinueLoop
 	  Local $iDuration = $aDuration[0] / 10
 	  ConsoleWrite("Duration: " & $iDuration & @CRLF)
 	  If $iDuration <= 5 Then
@@ -257,9 +254,8 @@ EndFunc    ;==>GIFAnimator
 Func GIFAnimatorSaveAsDialog()
    If Not WinActive(HWnd($GIFAnimatorhWnd)) Then WinActivate(HWnd($GIFAnimatorhWnd))
    _GUICtrlToolbar_ClickIndex($hToolbar, 4)
-   Local $ohWnd = _WaitSelectDialog()
-   If $Timeout Then
-	  $Timeout = False
+   Local $ohWnd = _WaitChildDialog($GIFAnimatorhWnd)
+   If @error Then
 	  GIFAnimatorSaveAsDialog()
 	  Return
    EndIf
@@ -278,19 +274,16 @@ Func GIFAnimatorOpen($sFilePath)
    ; Open (CTRL + O)
    _GUICtrlToolbar_ClickIndex($hToolbar, 1)
 
-   $Time = TimerInit()
-   Local $ohWnd = _WaitSelectDialog()
-   ; Probably user intervation, so let's ignore it
-   If WinGetTitle($ohWnd) = "File Not Saved" Then
-	  ControlClick($ohWnd, "", "Button2")
-	  $Timeout = True
-   EndIf
-   If $Timeout Then
-	  $Timeout = False
+   Local $ohWnd = _WaitChildDialog($GIFAnimatorhWnd)
+   If @error Then
 	  If Not WinExists($ohWnd) Then ; Valid HWnd
 		 GIFAnimatorOpen($sFilePath)
 	  EndIf
 	  Return
+   EndIf
+   ; Probably user intervation, so let's ignore it
+   If WinGetTitle($ohWnd) = "File Not Saved" Then
+	  ControlClick($ohWnd, "", "Button2")
    EndIf
 
    ; https://www.autoitscript.com/forum/topic/166908-cant-controll-class32770-windows-7/
@@ -348,32 +341,6 @@ Func _FileSelectFolder()
 	 Return $sFileSelectFolder
 EndFunc   ;==>_FileSelectFolder
 
-Func _WaitSelectDialog()
-   $Time = TimerInit()
-   While 1
-	  ; Retrieve a list of window handles.
-	  Local $aWinList = WinList()
-
-	  ; Run through GUIs to find those associated with the process
-	  For $i = 1 To $aWinList[0][0]
-		 ; Loop through the array displaying only visable windows with a title.
-		 If $aWinList[$i][0] <> "" And BitAND(WinGetState($aWinList[$i][1]), 2) Then
-			; If $GIFAnimatorDebug = True Then ConsoleWrite("Title: " & $aWinList[$i][0] & @CRLF & "Handle: " & $aWinList[$i][1] & "PID: " & WinGetProcess($aWinList[$i][1]) & " Parent ID: " & _WinAPI_GetParent ( $aWinList[$i][1] ) & @CRLF)
-			; If $GIFAnimatorDebug = True Then ConsoleWrite("If " & _WinAPI_GetParent ( $aWinList[$i][1] ) & " = " & $GIFAnimatorhWnd & " Then" & @CRLF)
-			If _WinAPI_GetParent ( $aWinList[$i][1] ) = $GIFAnimatorhWnd Then
-			   Return $aWinList[$i][1]
-			EndIf
-		 EndIf
-	  Next
-
-	  ; Timeout at 5sec
-	  If TimerDiff($Time) > 5 * 1000 Then
-		 $Timeout = True
-		 Return
-	  EndIf
-   WEnd
-EndFunc   ;==>_WaitSelectDialog
-
 Func GIFAnimatorParseArguments()
    Local $sFilePath = Null
    Local $sDirPath = Null
@@ -398,7 +365,7 @@ Func GIFAnimatorParseArguments()
 			If _FolderExists($CmdLine[$x]) Then
 			   $sDirPath = $CmdLine[$x]
 			   If $GIFAnimatorDebug = True Then ConsoleWrite("[Directory]: " & $sDirPath & @CRLF)
-			ElseIf _FileExists($CmdLine[$x]) Then
+			ElseIf FileExists($CmdLine[$x]) Then
 			   $sFilePath = $CmdLine[$x]
 			   If $GIFAnimatorDebug = True Then ConsoleWrite("[File]: " & $sFilePath & @CRLF)
 			Else
@@ -413,7 +380,7 @@ Func GIFAnimatorParseArguments()
 	  $sDirPath = _FileSelectFolder()
    EndIf
 
-   If _FileExists($sFilePath) Then
+   If FileExists($sFilePath) Then
 	  $aGIF[0] = 1
 	  $aGIF[1] = $sFilePath
    EndIf
@@ -497,14 +464,16 @@ Func GIFAnimatorQuit()
    Exit
 EndFunc
 
+#Region _IsEmpty()
 Func _IsEmpty($vVal)
     If IsArray($vVal) And (Eval($vVal) == '') Then
         Return True
-    ElseIf ($vVal == '') Then
+    ElseIf ($vVal == '') Or ($vVal == Null) Then
         Return True
     EndIf
-    Return 0
+    Return False
  EndFunc
+#EndRegion _IsEmpty()
 
 Func _GetGIFDuration($sFilePath)
    ; https://autoit.de/thread/46160-animiertes-gif-in-einzelne-frames-splitten/
@@ -521,6 +490,23 @@ Func _GetGIFDuration($sFilePath)
    _GDIPlus_Shutdown()
 
    Return $aDuration
+EndFunc
+
+Func _FolderExists($sPath)
+   If StringInStr(FileGetAttrib($sPath),"D") Then
+	  Return True
+   Else
+	  Return False
+   EndIf
+EndFunc
+
+Func _WaitChildDialog($hWnd)
+	Local $aGIFAnimatorOpenDialogs = _WinChildDialogs($hWnd, 5 * 1000) ; Timeout at 5sec
+	If $aGIFAnimatorOpenDialogs[0][0] > 0 Then
+		Return $aGIFAnimatorOpenDialogs[1][1] ; Return Child Dialog hWnd
+	EndIf
+
+	Return SetError(1, 0, $aGIFAnimatorOpenDialogs[0][0])
 EndFunc
 
 Func _Quotes($sString)
